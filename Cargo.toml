@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+members = ["serial-perf"]
+
+
+[workspace.package]
+version = "0.1.0"
+authors = ["Anton Kushakov (SpeedCrash100@yandex.ru)"]
+edition = "2021"
