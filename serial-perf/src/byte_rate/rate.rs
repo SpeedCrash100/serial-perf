@@ -128,6 +128,44 @@ impl ByteRate {
 
         Some(bytes_ns / ns)
     }
+
+    /// Calculate bytes per second using 32 bit float-point arithmetic
+    ///
+    /// Returns None if interval zero or bytes cannot fit into f32
+    pub fn bytes_per_second_f32(&self) -> Option<f32> {
+        if self.interval.is_zero() {
+            return None;
+        }
+
+        let interval_f32 = self.interval.as_secs_f32();
+        if interval_f32 <= f32::EPSILON {
+            return None;
+        }
+
+        let bytes_u16 = u16::try_from(self.bytes).ok()?;
+        let bytes_f32 = f32::from(bytes_u16);
+
+        Some(bytes_f32 / interval_f32)
+    }
+
+    /// Calculate bytes per second using 64 bit float-point arithmetic
+    ///
+    /// Returns None if interval zero or bytes cannot fit into f64
+    pub fn bytes_per_second_f64(&self) -> Option<f64> {
+        if self.interval.is_zero() {
+            return None;
+        }
+
+        let interval_f64 = self.interval.as_secs_f64();
+        if interval_f64 <= f64::EPSILON {
+            return None;
+        }
+
+        let bytes_u32 = u32::try_from(self.bytes).ok()?;
+        let bytes_f64 = f64::from(bytes_u32);
+
+        Some(bytes_f64 / interval_f64)
+    }
 }
 
 #[cfg(test)]
@@ -216,5 +254,28 @@ mod tests {
         let rate_per_sec = rate.bytes_per_second();
         assert!(rate_per_sec.is_some());
         assert_eq!(rate_per_sec.unwrap(), usize::MAX / 4);
+    }
+
+    #[test]
+    fn bytes_per_second_f32() {
+        let rate = ByteRate::new(147, Duration::from_secs(2));
+        let rate_per_sec = rate.bytes_per_second_f32();
+        assert!(rate_per_sec.is_some());
+        assert_eq!(rate_per_sec.unwrap(), 73.5);
+    }
+
+    #[test]
+    fn bytes_per_second_f32_overflow() {
+        let rate = ByteRate::new(u16::MAX as usize + 1, Duration::from_secs(2));
+        let rate_per_sec = rate.bytes_per_second_f32();
+        assert!(rate_per_sec.is_none());
+    }
+
+    #[test]
+    fn bytes_per_second_f64() {
+        let rate = ByteRate::new(u16::MAX as usize + 1, Duration::from_secs(2));
+        let rate_per_sec = rate.bytes_per_second_f64();
+        assert!(rate_per_sec.is_some());
+        assert_eq!(rate_per_sec.unwrap(), u16::MAX as f64 / 2.0 + 0.5);
     }
 }
