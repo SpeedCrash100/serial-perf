@@ -13,4 +13,14 @@ std = ["embedded-timers/std"]
 [dependencies]
 embedded-hal-nb = "1"
 embedded-timers = "0.3.0"
-heapless = "0.8"
+
+[dev-dependencies]
+linux-embedded-hal = "0.4"
+clap = { version = "4.5", features = ["derive"] }
+nb = "1.1.0"
+anyhow = "1"
+
+
+[[example]]
+name = "linux_loopback"
+required-features = ["std"]
