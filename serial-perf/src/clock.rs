@@ -3,7 +3,7 @@
 //!
 
 pub use embedded_timers::clock::Clock;
-pub use embedded_timers::timer::Timer;
+pub use embedded_timers::timer::{Timer, TimerError};
 
 /// A clock based on std::time
 #[cfg(feature = "std")]
