@@ -2,3 +2,6 @@
 
 pub mod byte_rate;
 pub mod clock;
+
+// Tests
+pub mod loopback;
