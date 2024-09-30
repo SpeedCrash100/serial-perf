@@ -8,7 +8,15 @@ where
     Serial: Read,
 {
     pub fn recv_nb(&mut self) -> Result<(), Serial::Error> {
-        let byte_read = self.serial.read()?;
+        let byte_read = match self.serial.read() {
+            Ok(b) => b,
+            Err(Error::WouldBlock) => return Err(Error::WouldBlock),
+            Err(e) => {
+                self.rx_stats.add_failed(1);
+                return Err(e);
+            }
+        };
+
         self.on_byte_received(byte_read);
 
         Ok(())
@@ -23,11 +31,17 @@ where
     pub fn send_nb(&mut self) -> Result<(), Serial::Error> {
         let byte_to_send = self.byte_to_send().ok_or(Error::WouldBlock)?;
 
-        self.serial.write(byte_to_send)?;
-
-        self.on_byte_sent();
-
-        Ok(())
+        match self.serial.write(byte_to_send) {
+            Ok(_) => {
+                self.on_byte_sent();
+                Ok(())
+            }
+            Err(Error::WouldBlock) => Err(Error::WouldBlock),
+            Err(e) => {
+                self.tx_stats.add_failed(1);
+                Err(e)
+            }
+        }
     }
 
     /// Flushes serial port using non blocking API
