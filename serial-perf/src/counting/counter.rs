@@ -232,10 +232,7 @@ mod tests {
         let mut test_counter = 0x0101_u16;
         let pop_value = test_counter.pop();
         assert_eq!(pop_value.distance(&test_counter), 1);
-        assert_eq!(
-            test_counter.distance(&pop_value),
-            u16::MAX as usize - 0x0101
-        );
+        assert_eq!(test_counter.distance(&pop_value), 65534);
     }
 
     #[cfg(any(
