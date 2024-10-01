@@ -110,3 +110,63 @@ impl_counter!(u16, 2);
 impl_counter!(u32, 4);
 #[cfg(target_pointer_width = "64")]
 impl_counter!(u64, 8);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(any(
+        target_pointer_width = "16",
+        target_pointer_width = "32",
+        target_pointer_width = "64"
+    ))]
+    #[test]
+    fn push_pop() {
+        let mut test_counter = 5_u16;
+        let pop_value = test_counter.pop();
+        assert_eq!(pop_value, 5);
+        assert_eq!(test_counter, 6);
+
+        test_counter.push();
+        assert_eq!(test_counter, 5);
+    }
+
+    #[cfg(any(
+        target_pointer_width = "16",
+        target_pointer_width = "32",
+        target_pointer_width = "64"
+    ))]
+    #[test]
+    fn distance() {
+        let mut test_counter = 5_u16;
+        let pop_value = test_counter.pop();
+        assert_eq!(pop_value.distance(&test_counter), 1);
+        assert_eq!(test_counter.distance(&pop_value), u16::MAX as usize - 1);
+    }
+
+    #[cfg(any(
+        target_pointer_width = "16",
+        target_pointer_width = "32",
+        target_pointer_width = "64"
+    ))]
+    #[test]
+    fn double_conversion() {
+        let test_counter = 5_u16;
+        let as_le_bytes = test_counter.to_le_bytes();
+        let mut as_data_queue = as_le_bytes.into_packet();
+        assert_eq!(as_data_queue.len(), 2 + 1); // +1 for null terminator
+
+        let mut recv_side = heapless::Vec::<u8, MAX_PACKET_SIZE>::new();
+        for _ in 0..2 {
+            recv_side.push(as_data_queue.pop().unwrap()).unwrap();
+        }
+
+        let recv_bytes = <u16 as Counter>::Bytes::from_slice_checked(&recv_side)
+            .expect("failed to create from slice");
+
+        assert_eq!(as_le_bytes, recv_bytes);
+
+        let recv_value = u16::from_le_bytes(recv_bytes);
+        assert_eq!(recv_value, test_counter)
+    }
+}
