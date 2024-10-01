@@ -25,3 +25,7 @@ anyhow = "1"
 [[example]]
 name = "linux_loopback"
 required-features = ["std"]
+
+[[example]]
+name = "linux_counter"
+required-features = ["std"]
