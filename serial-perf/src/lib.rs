@@ -5,4 +5,5 @@ pub mod clock;
 pub mod statistics;
 
 // Tests
+pub mod counting;
 pub mod loopback;

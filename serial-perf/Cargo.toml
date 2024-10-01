@@ -13,6 +13,7 @@ std = ["embedded-timers/std"]
 [dependencies]
 embedded-hal-nb = "1"
 embedded-timers = "0.3.0"
+heapless = "0.8"
 
 [dev-dependencies]
 linux-embedded-hal = "0.4"
