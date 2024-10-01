@@ -69,4 +69,8 @@ where
         debug_assert!(!self.current_packet.is_full());
         self.current_packet.push(byte).unwrap();
     }
+
+    pub fn loss_stats(&self) -> &Statistics {
+        &self.loss_stats
+    }
 }

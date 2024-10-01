@@ -43,6 +43,14 @@ where
         self.tx_stats = Default::default();
         self.rx_stats = Default::default();
     }
+
+    pub fn tx_stats(&self) -> &Statistics {
+        &self.tx_stats
+    }
+
+    pub fn rx_stats(&self) -> &Statistics {
+        &self.rx_stats
+    }
 }
 
 impl<Serial, Number> Counting<Serial, Number>
@@ -57,5 +65,9 @@ where
     fn on_byte_sent(&mut self) {
         self.tx_state.take();
         self.tx_stats.add_successful(1);
+    }
+
+    pub fn loss_stats(&self) -> &Statistics {
+        self.rx_state.loss_stats()
     }
 }
