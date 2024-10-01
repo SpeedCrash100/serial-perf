@@ -56,7 +56,7 @@ where
 
     pub fn on_byte_received(&mut self, byte: u8) {
         // Null terminator
-        if byte == 0 {
+        if byte == 0 && core::mem::size_of::<Number>() <= self.current_packet.len() {
             self.parse_current_packet();
             return;
         }
