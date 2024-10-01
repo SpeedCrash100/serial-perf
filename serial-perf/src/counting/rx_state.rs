@@ -67,6 +67,6 @@ where
         }
 
         debug_assert!(!self.current_packet.is_full());
-        self.current_packet.insert(0, byte).unwrap();
+        self.current_packet.push(byte).unwrap();
     }
 }
