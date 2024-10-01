@@ -10,7 +10,12 @@ mod nb;
 mod tx_state;
 use tx_state::TxState;
 
-const MAX_PACKET_SIZE: usize = 9; // 9 - 8 bytes if u64 and 1 byte for nul-terminator
+// Counting test packets structure
+// [0-8 bytes] - count
+// [1 byte] - null \0
+// [1 byte] - crc8 for count
+
+const MAX_PACKET_SIZE: usize = 10; // 10 - 8 bytes if u64 and 1 byte for nul-terminator 1 byte for crc
 
 use crate::statistics::Statistics;
 

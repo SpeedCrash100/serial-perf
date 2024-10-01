@@ -1,9 +1,11 @@
+use crc::{Crc, CRC_8_WCDMA};
+
 use super::MAX_PACKET_SIZE;
 use core::fmt::Debug;
 
 /// Internal bytes for counter that should always have non zero bytes
 pub trait LeBytes: Sized + Debug {
-    fn from_slice_checked(slice: &[u8]) -> Option<Self>;
+    fn from_slice_checked(slice: &[u8], checksum: u8) -> Option<Self>;
     fn into_packet(self) -> heapless::Vec<u8, MAX_PACKET_SIZE>;
 
     fn ones() -> Self;
@@ -14,8 +16,14 @@ pub trait LeBytes: Sized + Debug {
 }
 
 impl<const N: usize> LeBytes for [u8; N] {
-    fn from_slice_checked(slice: &[u8]) -> Option<Self> {
+    fn from_slice_checked(slice: &[u8], checksum: u8) -> Option<Self> {
         if N != slice.len() {
+            return None;
+        }
+
+        let crc = Crc::<u8>::new(&CRC_8_WCDMA);
+        let checksum_input = crc.checksum(slice);
+        if checksum_input != checksum {
             return None;
         }
 
@@ -26,11 +34,18 @@ impl<const N: usize> LeBytes for [u8; N] {
 
     fn into_packet(self) -> heapless::Vec<u8, MAX_PACKET_SIZE> {
         let mut out = heapless::Vec::new();
+        let mut crc_data = heapless::Vec::<_, MAX_PACKET_SIZE>::new();
 
         for byte in self {
             out.insert(0, byte).unwrap();
+            crc_data.push(byte).unwrap();
         }
+
+        let crc = Crc::<u8>::new(&CRC_8_WCDMA);
+        let checksum = crc.checksum(crc_data.as_slice());
+
         out.insert(0, 0).unwrap();
+        out.insert(0, checksum).unwrap();
 
         out
     }
@@ -245,14 +260,16 @@ mod tests {
         let test_counter = 5_u16;
         let as_le_bytes = test_counter.to_le_bytes();
         let mut as_data_queue = as_le_bytes.into_packet();
-        assert_eq!(as_data_queue.len(), 2 + 1); // +1 for null terminator
+        assert_eq!(as_data_queue.len(), 2 + 1 + 1); // +1 for null terminator +1 crc
+
+        let crc = *as_data_queue.first().unwrap();
 
         let mut recv_side = heapless::Vec::<u8, MAX_PACKET_SIZE>::new();
         for _ in 0..2 {
             recv_side.push(as_data_queue.pop().unwrap()).unwrap();
         }
 
-        let recv_bytes = <u16 as Counter>::Bytes::from_slice_checked(&recv_side)
+        let recv_bytes = <u16 as Counter>::Bytes::from_slice_checked(&recv_side, crc)
             .expect("failed to create from slice");
 
         assert_eq!(as_le_bytes, recv_bytes);
