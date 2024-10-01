@@ -1,8 +1,16 @@
 use super::MAX_PACKET_SIZE;
+use core::fmt::Debug;
 
-pub trait LeBytes: Sized {
+/// Internal bytes for counter that should always have non zero bytes
+pub trait LeBytes: Sized + Debug {
     fn from_slice_checked(slice: &[u8]) -> Option<Self>;
     fn into_packet(self) -> heapless::Vec<u8, MAX_PACKET_SIZE>;
+
+    fn ones() -> Self;
+
+    fn next(self) -> Self;
+    fn prev(self) -> Self;
+    fn distance(&self, other: &Self) -> usize;
 }
 
 impl<const N: usize> LeBytes for [u8; N] {
@@ -26,9 +34,77 @@ impl<const N: usize> LeBytes for [u8; N] {
 
         out
     }
+
+    fn ones() -> Self {
+        [0x01; N]
+    }
+
+    fn next(mut self) -> Self {
+        for byte in &mut self {
+            // LE byte overflow, add carry to the next one.
+            if *byte == 0xFF {
+                *byte = 0x01;
+                continue;
+            }
+
+            *byte = byte.wrapping_add(1);
+            break;
+        }
+
+        self
+    }
+    fn prev(mut self) -> Self {
+        for byte in &mut self {
+            // LE byte underflow, add carry to the next one.
+            if *byte <= 0x01 {
+                *byte = 0xFF;
+                continue;
+            }
+
+            *byte = byte.wrapping_sub(1);
+            break;
+        }
+
+        self
+    }
+
+    fn distance(&self, other: &Self) -> usize {
+        // Use allowed only if self < other
+        let iter_pair = self.iter().zip(other.iter());
+        let mut pos = 0;
+
+        // 0b0000_1101
+        // 0b1111_0000
+        // 0b1110_1101
+
+        let mut total_distance = 0_usize;
+        let mut overflow = false;
+        for (left, right) in iter_pair {
+            let mut local_distance = if left <= right {
+                right - left
+            } else {
+                let to_max_dist = 0xFF - left;
+                let from_min_dist = *right;
+                to_max_dist + from_min_dist
+            };
+
+            if overflow {
+                local_distance = local_distance.wrapping_sub(1);
+            }
+
+            total_distance += (local_distance as usize) << (8 * pos);
+
+            if right < left {
+                overflow = true;
+            }
+            pos += 1;
+        }
+
+        total_distance
+    }
 }
 
-pub trait Counter: Default {
+pub trait Counter: Default + Debug {
     type Bytes: LeBytes;
 
     /// Increment the counter and return its previous value.
@@ -42,6 +118,11 @@ pub trait Counter: Default {
 
     fn to_le_bytes(&self) -> Self::Bytes;
     fn from_le_bytes(bytes: Self::Bytes) -> Self;
+
+    fn min_counter() -> Self {
+        let ones = Self::Bytes::ones();
+        Self::from_le_bytes(ones)
+    }
 }
 
 macro_rules! impl_counter {
@@ -51,35 +132,45 @@ macro_rules! impl_counter {
 
             fn pop(&mut self) -> Self {
                 let mut result = *self;
-                if result == 0 {
-                    result = 1;
+                if result < Self::min_counter() {
+                    result = Self::min_counter();
                 }
 
-                *self = result.wrapping_add(1);
+                let bytes = result.to_le_bytes();
+                let next_bytes = bytes.next();
+                *self = Self::from_le_bytes(next_bytes);
 
                 result
             }
 
             fn push(&mut self) {
-                *self = (*self).wrapping_sub(1);
-                if *self == 0 {
-                    *self = 1;
+                let bytes = self.to_le_bytes();
+                let prev_bytes = bytes.prev();
+
+                *self = Self::from_le_bytes(prev_bytes);
+                if *self < Self::min_counter() {
+                    *self = Self::min_counter();
                 }
             }
 
             fn distance(&self, value: &Self) -> usize {
-                if *self < *value {
-                    (value - self) as usize
-                } else {
-                    // 0 1 2 3 4 5 6 7 8 9
-                    //   $     ^---------^
-                    //   |         9-4=5
-                    //    \ 1 step
+                let left = self.to_le_bytes();
+                let right = value.to_le_bytes();
 
-                    let to_max_dist = <$x>::MAX - *self;
-                    let from_min_dist = *value as usize;
-                    to_max_dist as usize + from_min_dist
-                }
+                left.distance(&right)
+
+                // if *self < *value {
+                //     (value - self) as usize
+                // } else {
+                //     // 0 1 2 3 4 5 6 7 8 9
+                //     //   $     ^---------^
+                //     //   |         9-4=5
+                //     //    \ 1 step
+
+                //     let to_max_dist = <$x>::MAX - *self;
+                //     let from_min_dist = *value - <$x>::min_counter() + 1;
+                //     to_max_dist as usize + from_min_dist as usize
+                // }
             }
 
             fn to_le_bytes(&self) -> Self::Bytes {
@@ -124,11 +215,11 @@ mod tests {
     fn push_pop() {
         let mut test_counter = 5_u16;
         let pop_value = test_counter.pop();
-        assert_eq!(pop_value, 5);
-        assert_eq!(test_counter, 6);
+        assert_eq!(pop_value, u16::min_counter());
+        assert_eq!(test_counter, u16::min_counter() + 1);
 
         test_counter.push();
-        assert_eq!(test_counter, 5);
+        assert_eq!(test_counter, u16::min_counter());
     }
 
     #[cfg(any(
@@ -138,10 +229,13 @@ mod tests {
     ))]
     #[test]
     fn distance() {
-        let mut test_counter = 5_u16;
+        let mut test_counter = 0x0101_u16;
         let pop_value = test_counter.pop();
         assert_eq!(pop_value.distance(&test_counter), 1);
-        assert_eq!(test_counter.distance(&pop_value), u16::MAX as usize - 1);
+        assert_eq!(
+            test_counter.distance(&pop_value),
+            u16::MAX as usize - 0x0101
+        );
     }
 
     #[cfg(any(

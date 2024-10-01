@@ -48,6 +48,7 @@ where
             let distance = old_number.distance(&new_number);
             let loss = distance - 1;
             self.loss_stats.add_failed(loss);
+            // FIXME: Detect absurd jumps?
         }
 
         self.number = Some(new_number);
@@ -56,7 +57,7 @@ where
 
     pub fn on_byte_received(&mut self, byte: u8) {
         // Null terminator
-        if byte == 0 && core::mem::size_of::<Number>() <= self.current_packet.len() {
+        if byte == 0 {
             self.parse_current_packet();
             return;
         }
