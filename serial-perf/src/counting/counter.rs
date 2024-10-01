@@ -76,9 +76,9 @@ macro_rules! impl_counter {
                     //   |         9-4=5
                     //    \ 1 step
 
-                    let to_max_dist = usize::MAX - *self as usize;
+                    let to_max_dist = <$x>::MAX - *self;
                     let from_min_dist = *value as usize;
-                    to_max_dist + from_min_dist
+                    to_max_dist as usize + from_min_dist
                 }
             }
 
