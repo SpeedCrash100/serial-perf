@@ -1,4 +1,4 @@
-use crc::{Crc, CRC_8_WCDMA};
+use crc::Crc;
 
 use super::MAX_PACKET_SIZE;
 use core::fmt::Debug;
@@ -21,7 +21,7 @@ impl<const N: usize> LeBytes for [u8; N] {
             return None;
         }
 
-        let crc = Crc::<u8>::new(&CRC_8_WCDMA);
+        let crc = Crc::<u8>::new(&crc::CRC_8_AUTOSAR);
         let checksum_input = crc.checksum(slice);
         if checksum_input != checksum {
             return None;
@@ -41,7 +41,7 @@ impl<const N: usize> LeBytes for [u8; N] {
             crc_data.push(byte).unwrap();
         }
 
-        let crc = Crc::<u8>::new(&CRC_8_WCDMA);
+        let crc = Crc::<u8>::new(&crc::CRC_8_AUTOSAR);
         let checksum = crc.checksum(crc_data.as_slice());
 
         out.insert(0, 0).unwrap();
