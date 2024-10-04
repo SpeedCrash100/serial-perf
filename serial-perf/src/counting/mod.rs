@@ -19,6 +19,16 @@ const MAX_PACKET_SIZE: usize = 10; // 10 - 8 bytes if u64 and 1 byte for nul-ter
 
 use crate::statistics::Statistics;
 
+/// Counting test is a test that sends a special increasing numbers
+/// with checksum and null separator and can receive these packets
+/// and calculate amount of lost packages by comparing the number in package
+///
+/// # Template parameters
+/// - `Serial` - serial device to use for communication
+/// - `Number` - a size of counter used. limited to size of usize. Can be u8, u16, u32, u64 on 64 bit platforms
+///
+/// # Warning
+/// If `Counting` receives a packets from a different `Counting` they both must use same `Number` template argument.
 pub struct Counting<Serial, Number> {
     serial: Serial,
     tx_state: TxState<Number>,

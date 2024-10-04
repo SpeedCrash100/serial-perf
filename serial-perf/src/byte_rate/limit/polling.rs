@@ -12,7 +12,8 @@ enum State {
     Unlimited,
 }
 
-/// Polling byte rate limiter
+/// Limiter that required cannot notify a client about the rate limit being reached so uses a polling approach.
+/// The client uses `can_send` to check if it can send. The client call `send` on successful byte sent
 pub struct PollingByteRateLimiter<'clk, Clk>
 where
     Clk: Clock,
