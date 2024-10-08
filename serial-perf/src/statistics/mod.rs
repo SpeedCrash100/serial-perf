@@ -11,6 +11,9 @@ pub use counting::CountingStatistics;
 mod avg_rate;
 pub use avg_rate::AvgRateStatistics;
 
+mod interval_rate;
+pub use interval_rate::IntervalRateStatistics;
+
 /// Trait for capturing statistics,
 pub trait Statistics {
     /// Adds `count` successful packets to the statistics

@@ -1,7 +1,7 @@
 use core::time::Duration;
 
 /// Holds a data needed to calculate the byte rate.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ByteRate {
     bytes: usize,
     interval: Duration,

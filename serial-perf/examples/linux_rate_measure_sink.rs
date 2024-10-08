@@ -11,7 +11,7 @@ use linux_embedded_hal::Serial;
 use serial_perf::{
     clock::StdClock,
     loopback::Loopback,
-    statistics::{AvgRateStatistics, DummyStatistics},
+    statistics::{DummyStatistics, IntervalRateStatistics},
 };
 
 const PRINT_INTERVAL_MS: u64 = 5000;
@@ -37,7 +37,7 @@ fn main() -> anyhow::Result<()> {
     let serial = args.create_serial();
 
     let clock = StdClock;
-    let rx_stats = AvgRateStatistics::new(&clock);
+    let rx_stats = IntervalRateStatistics::new(&clock, Duration::from_secs(5));
     let mut loopback = Loopback::new(serial, DummyStatistics, rx_stats);
 
     let mut last_print = Instant::now();
@@ -50,13 +50,11 @@ fn main() -> anyhow::Result<()> {
 
             let success = rx_stats
                 .success_rate()
-                .unwrap_or_default()
                 .bytes_per_second_f64()
                 .unwrap_or_default();
 
             let fail = rx_stats
                 .failed_rate()
-                .unwrap_or_default()
                 .bytes_per_second_f64()
                 .unwrap_or_default();
 
