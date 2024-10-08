@@ -47,26 +47,31 @@ pub struct Counting<
 impl<Serial, Number, TxStats, RxStats, LossStats>
     Counting<Serial, Number, TxStats, RxStats, LossStats>
 where
-    Number: Default,
+    Number: Counter,
     TxStats: Statistics,
     RxStats: Statistics,
     LossStats: Statistics,
 {
-    pub fn new(serial: Serial) -> Self {
+    pub fn new(
+        serial: Serial,
+        tx_stats: TxStats,
+        rx_stats: RxStats,
+        loss_stats: LossStats,
+    ) -> Self {
         Self {
             serial,
             tx_state: Default::default(),
-            rx_state: Default::default(),
-            tx_stats: Default::default(),
-            rx_stats: Default::default(),
+            rx_state: RxState::new(loss_stats),
+            tx_stats,
+            rx_stats,
         }
     }
 
     pub fn reset(&mut self) {
         self.tx_state = Default::default();
-        self.rx_state = Default::default();
-        self.tx_stats = Default::default();
-        self.rx_stats = Default::default();
+        self.rx_state.reset();
+        self.tx_stats.reset();
+        self.rx_stats.reset();
     }
 
     pub fn tx_stats(&self) -> &TxStats {

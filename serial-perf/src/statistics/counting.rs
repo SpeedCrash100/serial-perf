@@ -34,4 +34,9 @@ impl Statistics for CountingStatistics {
     fn add_successful(&mut self, count: usize) {
         self.successful = self.successful.saturating_add(count);
     }
+
+    fn reset(&mut self) {
+        self.failed = 0;
+        self.successful = 0;
+    }
 }

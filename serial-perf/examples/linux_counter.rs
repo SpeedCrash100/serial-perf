@@ -9,6 +9,7 @@ use serial_perf::{
     },
     clock::StdClock,
     counting::Counting,
+    statistics::CountingStatistics,
 };
 
 const PRINT_INTERVAL_MS: u64 = 5000;
@@ -49,7 +50,12 @@ fn main() -> anyhow::Result<()> {
 
     let serial = args.create_serial();
     let limited_serial = ByteRateSerialLimiter::new(serial, rate_limiter);
-    let mut counter = Counting::<_, u16>::new(limited_serial);
+    let mut counter = Counting::<_, u16>::new(
+        limited_serial,
+        CountingStatistics::default(),
+        CountingStatistics::default(),
+        CountingStatistics::default(),
+    );
 
     let mut last_print = Instant::now();
 

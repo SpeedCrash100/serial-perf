@@ -25,12 +25,16 @@ where
     TxStats: Statistics,
     RxStats: Statistics,
 {
-    pub fn new(serial: Serial) -> Self {
+    /// Create a new loopback instance using provided serial and statistics.
+    ///
+    /// # Note
+    /// The provided statistics will not reset upon creation, so you may want to call `reset` after creation if desired.
+    pub fn new(serial: Serial, tx_stats: TxStats, rx_stats: RxStats) -> Self {
         Self {
             serial,
             state: State::Receiving,
-            tx_stats: Default::default(),
-            rx_stats: Default::default(),
+            tx_stats,
+            rx_stats,
         }
     }
 
@@ -43,8 +47,8 @@ where
     }
 
     pub fn reset_stats(&mut self) {
-        self.tx_stats = Default::default();
-        self.rx_stats = Default::default();
+        self.tx_stats.reset();
+        self.rx_stats.reset();
     }
 
     fn on_byte_received(&mut self, byte: u8) {

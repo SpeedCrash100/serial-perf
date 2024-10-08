@@ -23,26 +23,27 @@ pub struct RxState<Number, LossStats> {
     loss_stats: LossStats,
 }
 
-impl<Number, LossStats> Default for RxState<Number, LossStats>
-where
-    Number: Default,
-    LossStats: Default,
-{
-    fn default() -> Self {
-        Self {
-            number: None,
-            current_packet: heapless::Vec::new(),
-            internal_state: InternalState::Receiving,
-            loss_stats: Default::default(),
-        }
-    }
-}
-
 impl<Number, LossStats> RxState<Number, LossStats>
 where
     Number: Counter,
     LossStats: Statistics,
 {
+    pub fn new(loss_stats: LossStats) -> Self {
+        Self {
+            number: None,
+            current_packet: heapless::Vec::new(),
+            internal_state: InternalState::Receiving,
+            loss_stats,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.number = None;
+        self.current_packet.clear();
+        self.internal_state = InternalState::Receiving;
+        self.loss_stats.reset();
+    }
+
     /// Parses and handling incoming packet
     fn parse_current_packet(&mut self, crc: u8) {
         if let Some(new_number_raw) = Number::Bytes::from_slice_checked(&self.current_packet, crc) {

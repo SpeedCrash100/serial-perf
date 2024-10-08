@@ -1,6 +1,6 @@
 use clap::Parser;
 use linux_embedded_hal::Serial;
-use serial_perf::loopback::Loopback;
+use serial_perf::{loopback::Loopback, statistics::CountingStatistics};
 
 #[derive(Parser)]
 pub struct CommonArgs {
@@ -21,7 +21,11 @@ fn main() -> anyhow::Result<()> {
     let args = CommonArgs::parse();
 
     let serial = args.create_serial();
-    let mut loopback = Loopback::<_>::new(serial);
+    let mut loopback = Loopback::new(
+        serial,
+        CountingStatistics::default(),
+        CountingStatistics::default(),
+    );
 
     println!("Start loop");
     loop {
