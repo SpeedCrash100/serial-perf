@@ -2,6 +2,9 @@
 //! Struct for storing the statistics of a TX/RX paths(total bytes, errors, etc)
 //!
 
+mod dummy;
+pub use dummy::DummyStatistics;
+
 mod counting;
 pub use counting::CountingStatistics;
 

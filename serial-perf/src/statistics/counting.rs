@@ -1,5 +1,6 @@
 use super::Statistics;
 
+/// Counting is a simple statistics for count the number of packets sent/received successfully, failed.
 #[derive(Debug, Default)]
 pub struct CountingStatistics {
     /// Number of packets that were successfully sent/received
