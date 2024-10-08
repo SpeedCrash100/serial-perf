@@ -17,7 +17,7 @@ use tx_state::TxState;
 
 const MAX_PACKET_SIZE: usize = 10; // 10 - 8 bytes if u64 and 1 byte for nul-terminator 1 byte for crc
 
-use crate::statistics::Statistics;
+use crate::statistics::{CountingStatistics, Statistics};
 
 /// Counting test is a test that sends a special increasing numbers
 /// with checksum and null separator and can receive these packets
@@ -29,18 +29,28 @@ use crate::statistics::Statistics;
 ///
 /// # Warning
 /// If `Counting` receives a packets from a different `Counting` they both must use same `Number` template argument.
-pub struct Counting<Serial, Number> {
+pub struct Counting<
+    Serial,
+    Number,
+    TxStats = CountingStatistics,
+    RxStats = CountingStatistics,
+    LossStats = CountingStatistics,
+> {
     serial: Serial,
     tx_state: TxState<Number>,
-    rx_state: RxState<Number>,
+    rx_state: RxState<Number, LossStats>,
 
-    tx_stats: Statistics,
-    rx_stats: Statistics,
+    tx_stats: TxStats,
+    rx_stats: RxStats,
 }
 
-impl<Serial, Number> Counting<Serial, Number>
+impl<Serial, Number, TxStats, RxStats, LossStats>
+    Counting<Serial, Number, TxStats, RxStats, LossStats>
 where
     Number: Default,
+    TxStats: Statistics,
+    RxStats: Statistics,
+    LossStats: Statistics,
 {
     pub fn new(serial: Serial) -> Self {
         Self {
@@ -59,18 +69,22 @@ where
         self.rx_stats = Default::default();
     }
 
-    pub fn tx_stats(&self) -> &Statistics {
+    pub fn tx_stats(&self) -> &TxStats {
         &self.tx_stats
     }
 
-    pub fn rx_stats(&self) -> &Statistics {
+    pub fn rx_stats(&self) -> &RxStats {
         &self.rx_stats
     }
 }
 
-impl<Serial, Number> Counting<Serial, Number>
+impl<Serial, Number, TxStats, RxStats, LossStats>
+    Counting<Serial, Number, TxStats, RxStats, LossStats>
 where
     Number: Counter,
+    TxStats: Statistics,
+    RxStats: Statistics,
+    LossStats: Statistics,
 {
     fn on_byte_received(&mut self, byte: u8) {
         self.rx_state.on_byte_received(byte);
@@ -82,7 +96,7 @@ where
         self.tx_stats.add_successful(1);
     }
 
-    pub fn loss_stats(&self) -> &Statistics {
+    pub fn loss_stats(&self) -> &LossStats {
         self.rx_state.loss_stats()
     }
 }

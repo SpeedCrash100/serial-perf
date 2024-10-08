@@ -2,42 +2,15 @@
 //! Struct for storing the statistics of a TX/RX paths(total bytes, errors, etc)
 //!
 
-#[derive(Debug, Default)]
-pub struct Statistics {
-    /// Number of packets that were successfully sent/received
-    successful: usize,
+mod counting;
+pub use counting::CountingStatistics;
 
-    /// Number of packets that were not sent/received
-    failed: usize,
-}
+/// Trait for capturing statistics,
+/// resetting is done by the creating new instance with Default::default() and replacing old one
+pub trait Statistics: Default {
+    /// Adds `count` successful packets to the statistics
+    fn add_successful(&mut self, count: usize);
 
-impl Statistics {
-    /// Returns the total number of packets sent/received
-    pub fn total(&self) -> usize {
-        self.successful + self.failed
-    }
-
-    /// Returns the number of packets that were successfully sent/received
-    pub fn successful(&self) -> usize {
-        self.successful
-    }
-
-    /// Returns the number of packets that were not sent/received or rejected when received
-    pub fn failed(&self) -> usize {
-        self.failed
-    }
-
-    /// Resets the statistics to initial state
-    pub fn reset(&mut self) {
-        self.successful = 0;
-        self.failed = 0;
-    }
-
-    pub fn add_successful(&mut self, count: usize) {
-        self.successful += count;
-    }
-
-    pub fn add_failed(&mut self, count: usize) {
-        self.failed += count;
-    }
+    /// Adds `count` failed packets to the statistics
+    fn add_failed(&mut self, count: usize);
 }

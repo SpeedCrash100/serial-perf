@@ -21,7 +21,7 @@ fn main() -> anyhow::Result<()> {
     let args = CommonArgs::parse();
 
     let serial = args.create_serial();
-    let mut loopback = Loopback::new(serial);
+    let mut loopback = Loopback::<_>::new(serial);
 
     println!("Start loop");
     loop {

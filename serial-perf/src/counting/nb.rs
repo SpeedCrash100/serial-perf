@@ -1,13 +1,19 @@
 use embedded_hal_nb::nb::{Error, Result};
 use embedded_hal_nb::serial::{Read, Write};
 
+use crate::statistics::Statistics;
+
 use super::counter::Counter;
 use super::Counting;
 
-impl<Serial, Number> Counting<Serial, Number>
+impl<Serial, Number, TxStats, RxStats, LossStats>
+    Counting<Serial, Number, TxStats, RxStats, LossStats>
 where
     Serial: Read,
     Number: Counter,
+    TxStats: Statistics,
+    RxStats: Statistics,
+    LossStats: Statistics,
 {
     /// Receive byte from the serial port and verify it. Non-blocking.
     pub fn recv_nb(&mut self) -> Result<(), Serial::Error> {
@@ -26,10 +32,14 @@ where
     }
 }
 
-impl<Serial, Number> Counting<Serial, Number>
+impl<Serial, Number, TxStats, RxStats, LossStats>
+    Counting<Serial, Number, TxStats, RxStats, LossStats>
 where
     Serial: Write,
     Number: Counter,
+    TxStats: Statistics,
+    RxStats: Statistics,
+    LossStats: Statistics,
 {
     /// Sends next byte using non blocking API
     pub fn send_nb(&mut self) -> Result<(), Serial::Error> {
@@ -57,10 +67,14 @@ where
     }
 }
 
-impl<Serial, Number> Counting<Serial, Number>
+impl<Serial, Number, TxStats, RxStats, LossStats>
+    Counting<Serial, Number, TxStats, RxStats, LossStats>
 where
     Serial: Write + Read,
     Number: Counter,
+    TxStats: Statistics,
+    RxStats: Statistics,
+    LossStats: Statistics,
 {
     pub fn loop_nb(&mut self) -> Result<(), Serial::Error> {
         let (recv_res, send_res) = (self.recv_nb(), self.send_nb());

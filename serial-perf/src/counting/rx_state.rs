@@ -10,7 +10,7 @@ enum InternalState {
     WaitingForCRC,
 }
 
-pub struct RxState<Number> {
+pub struct RxState<Number, LossStats> {
     /// The last number received to analyze the packet loss.
     number: Option<Number>,
 
@@ -20,12 +20,13 @@ pub struct RxState<Number> {
     internal_state: InternalState,
 
     /// The statistics of the packet loss. Note: this is not a rx_stats because it's analyze packets, not bytes
-    loss_stats: Statistics,
+    loss_stats: LossStats,
 }
 
-impl<Number> Default for RxState<Number>
+impl<Number, LossStats> Default for RxState<Number, LossStats>
 where
     Number: Default,
+    LossStats: Default,
 {
     fn default() -> Self {
         Self {
@@ -37,9 +38,10 @@ where
     }
 }
 
-impl<Number> RxState<Number>
+impl<Number, LossStats> RxState<Number, LossStats>
 where
     Number: Counter,
+    LossStats: Statistics,
 {
     /// Parses and handling incoming packet
     fn parse_current_packet(&mut self, crc: u8) {
@@ -70,7 +72,7 @@ where
         }
     }
 
-    pub fn loss_stats(&self) -> &Statistics {
+    pub fn loss_stats(&self) -> &LossStats {
         &self.loss_stats
     }
 

@@ -2,7 +2,7 @@
 //! Loopback is a simple utility that send back bytes it's received
 //!
 
-use crate::statistics::Statistics;
+use crate::statistics::{CountingStatistics, Statistics};
 
 mod nb;
 
@@ -12,15 +12,19 @@ enum State {
 }
 
 /// A wrapper around serial that sends data it's received
-pub struct Loopback<Serial> {
+pub struct Loopback<Serial, TxStats = CountingStatistics, RxStats = CountingStatistics> {
     serial: Serial,
     state: State,
 
-    tx_stats: Statistics,
-    rx_stats: Statistics,
+    tx_stats: TxStats,
+    rx_stats: RxStats,
 }
 
-impl<Serial> Loopback<Serial> {
+impl<Serial, TxStats, RxStats> Loopback<Serial, TxStats, RxStats>
+where
+    TxStats: Statistics,
+    RxStats: Statistics,
+{
     pub fn new(serial: Serial) -> Self {
         Self {
             serial,
@@ -30,11 +34,11 @@ impl<Serial> Loopback<Serial> {
         }
     }
 
-    pub fn tx_stats(&self) -> &Statistics {
+    pub fn tx_stats(&self) -> &TxStats {
         &self.tx_stats
     }
 
-    pub fn rx_stats(&self) -> &Statistics {
+    pub fn rx_stats(&self) -> &RxStats {
         &self.rx_stats
     }
 

@@ -1,11 +1,15 @@
 use embedded_hal_nb::nb::{Error, Result};
 use embedded_hal_nb::serial::{Read, Write};
 
+use crate::statistics::Statistics;
+
 use super::{Loopback, State};
 
-impl<Serial> Loopback<Serial>
+impl<Serial, TxStats, RxStats> Loopback<Serial, TxStats, RxStats>
 where
     Serial: Read,
+    TxStats: Statistics,
+    RxStats: Statistics,
 {
     pub fn recv_nb(&mut self) -> Result<(), Serial::Error> {
         let byte_read = match self.serial.read() {
@@ -23,9 +27,11 @@ where
     }
 }
 
-impl<Serial> Loopback<Serial>
+impl<Serial, TxStats, RxStats> Loopback<Serial, TxStats, RxStats>
 where
     Serial: Write,
+    TxStats: Statistics,
+    RxStats: Statistics,
 {
     /// Sends next byte using non blocking API
     pub fn send_nb(&mut self) -> Result<(), Serial::Error> {
@@ -53,9 +59,11 @@ where
     }
 }
 
-impl<Serial> Loopback<Serial>
+impl<Serial, TxStats, RxStats> Loopback<Serial, TxStats, RxStats>
 where
     Serial: Write + Read,
+    TxStats: Statistics,
+    RxStats: Statistics,
 {
     pub fn loop_nb(&mut self) -> Result<(), Serial::Error> {
         match self.state {
