@@ -63,4 +63,12 @@ where
             }
         }
     }
+
+    pub fn is_started(&self) -> bool {
+        if let State::Idle = self.state {
+            return false;
+        }
+
+        true
+    }
 }

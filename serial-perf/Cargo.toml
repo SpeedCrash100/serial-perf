@@ -30,3 +30,7 @@ required-features = ["std"]
 [[example]]
 name = "linux_counter"
 required-features = ["std"]
+
+[[example]]
+name = "linux_rate_measure_sink"
+required-features = ["std"]

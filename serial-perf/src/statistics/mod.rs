@@ -8,6 +8,9 @@ pub use dummy::DummyStatistics;
 mod counting;
 pub use counting::CountingStatistics;
 
+mod avg_rate;
+pub use avg_rate::AvgRateStatistics;
+
 /// Trait for capturing statistics,
 pub trait Statistics {
     /// Adds `count` successful packets to the statistics

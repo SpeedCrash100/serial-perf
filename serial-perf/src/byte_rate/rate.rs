@@ -1,6 +1,7 @@
 use core::time::Duration;
 
 /// Holds a data needed to calculate the byte rate.
+#[derive(Debug)]
 pub struct ByteRate {
     bytes: usize,
     interval: Duration,
@@ -165,6 +166,15 @@ impl ByteRate {
         let bytes_f64 = f64::from(bytes_u32);
 
         Some(bytes_f64 / interval_f64)
+    }
+}
+
+impl Default for ByteRate {
+    fn default() -> Self {
+        Self {
+            bytes: 0,
+            interval: Duration::from_secs(1),
+        }
     }
 }
 
