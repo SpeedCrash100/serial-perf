@@ -6,7 +6,11 @@ use core::fmt::Debug;
 /// Internal bytes for counter that should always have non zero bytes
 pub trait LeBytes: Sized + Debug {
     fn from_slice_checked(slice: &[u8], checksum: u8) -> Option<Self>;
-    fn into_packet(self) -> heapless::Vec<u8, MAX_PACKET_SIZE>;
+    /// Returns package for sending these bytes.
+    ///
+    /// If checksum enabled crc will be calculated and appended to the end of packet,
+    /// otherwise it will be set to value of the first byte.
+    fn into_packet(self, checksum_enabled: bool) -> heapless::Vec<u8, MAX_PACKET_SIZE>;
 
     fn ones() -> Self;
 
@@ -32,7 +36,7 @@ impl<const N: usize> LeBytes for [u8; N] {
         Some(out)
     }
 
-    fn into_packet(self) -> heapless::Vec<u8, MAX_PACKET_SIZE> {
+    fn into_packet(self, checksum_enabled: bool) -> heapless::Vec<u8, MAX_PACKET_SIZE> {
         let mut out = heapless::Vec::new();
         let mut crc_data = heapless::Vec::<_, MAX_PACKET_SIZE>::new();
 
@@ -41,8 +45,11 @@ impl<const N: usize> LeBytes for [u8; N] {
             crc_data.push(byte).unwrap();
         }
 
-        let crc = Crc::<u8>::new(&crc::CRC_8_AUTOSAR);
-        let checksum = crc.checksum(crc_data.as_slice());
+        let mut checksum = crc_data.first().copied().unwrap_or(0);
+        if checksum_enabled {
+            let crc = Crc::<u8>::new(&crc::CRC_8_AUTOSAR);
+            checksum = crc.checksum(crc_data.as_slice());
+        }
 
         out.insert(0, 0).unwrap();
         out.insert(0, checksum).unwrap();
@@ -259,7 +266,7 @@ mod tests {
     fn double_conversion() {
         let test_counter = 5_u16;
         let as_le_bytes = test_counter.to_le_bytes();
-        let mut as_data_queue = as_le_bytes.into_packet();
+        let mut as_data_queue = as_le_bytes.into_packet(true);
         assert_eq!(as_data_queue.len(), 2 + 1 + 1); // +1 for null terminator +1 crc
 
         let crc = *as_data_queue.first().unwrap();

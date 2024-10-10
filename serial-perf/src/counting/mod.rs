@@ -67,6 +67,21 @@ where
         }
     }
 
+    pub fn new_without_checksum(
+        serial: Serial,
+        tx_stats: TxStats,
+        rx_stats: RxStats,
+        loss_stats: LossStats,
+    ) -> Self {
+        Self {
+            serial,
+            tx_state: TxState::new_without_checksum(),
+            rx_state: RxState::new(loss_stats),
+            tx_stats,
+            rx_stats,
+        }
+    }
+
     pub fn reset(&mut self) {
         self.tx_state = Default::default();
         self.rx_state.reset();
