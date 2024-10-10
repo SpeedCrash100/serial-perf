@@ -95,7 +95,6 @@ impl<const N: usize> LeBytes for [u8; N] {
     fn distance(&self, other: &Self) -> usize {
         // Use allowed only if self < other
         let iter_pair = self.iter().zip(other.iter());
-        let mut pos = 0;
 
         // 0b0000_1101
         // 0b1111_0000
@@ -103,7 +102,7 @@ impl<const N: usize> LeBytes for [u8; N] {
 
         let mut total_distance = 0_usize;
         let mut overflow = false;
-        for (left, right) in iter_pair {
+        for (pos, (left, right)) in iter_pair.enumerate() {
             let mut local_distance = if left <= right {
                 right - left
             } else {
@@ -121,7 +120,6 @@ impl<const N: usize> LeBytes for [u8; N] {
             if right < left {
                 overflow = true;
             }
-            pos += 1;
         }
 
         total_distance
