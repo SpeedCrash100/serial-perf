@@ -14,9 +14,7 @@ pub trait LeBytes: Sized + Debug {
 
     fn ones() -> Self;
 
-    fn next(self) -> Self;
-    fn prev(self) -> Self;
-    fn distance(&self, other: &Self) -> usize;
+    fn filled() -> Self;
 }
 
 impl<const N: usize> LeBytes for [u8; N] {
@@ -63,66 +61,8 @@ impl<const N: usize> LeBytes for [u8; N] {
         [0x01; N]
     }
 
-    fn next(mut self) -> Self {
-        for byte in &mut self {
-            // LE byte overflow, add carry to the next one.
-            if *byte == 0xFF {
-                *byte = 0x01;
-                continue;
-            }
-
-            *byte = byte.wrapping_add(1);
-            break;
-        }
-
-        self
-    }
-    fn prev(mut self) -> Self {
-        for byte in &mut self {
-            // LE byte underflow, add carry to the next one.
-            if *byte <= 0x01 {
-                *byte = 0xFF;
-                continue;
-            }
-
-            *byte = byte.wrapping_sub(1);
-            break;
-        }
-
-        self
-    }
-
-    fn distance(&self, other: &Self) -> usize {
-        // Use allowed only if self < other
-        let iter_pair = self.iter().zip(other.iter());
-
-        // 0b0000_1101
-        // 0b1111_0000
-        // 0b1110_1101
-
-        let mut total_distance = 0_usize;
-        let mut overflow = false;
-        for (pos, (left, right)) in iter_pair.enumerate() {
-            let mut local_distance = if left <= right {
-                right - left
-            } else {
-                let to_max_dist = 0xFF - left;
-                let from_min_dist = *right;
-                to_max_dist + from_min_dist
-            };
-
-            if overflow {
-                local_distance = local_distance.wrapping_sub(1);
-            }
-
-            total_distance += (local_distance as usize) << (8 * pos);
-
-            if right < left {
-                overflow = true;
-            }
-        }
-
-        total_distance
+    fn filled() -> Self {
+        [0xFF; N]
     }
 }
 
@@ -141,9 +81,23 @@ pub trait Counter: Default + Debug {
     fn to_le_bytes(&self) -> Self::Bytes;
     fn from_le_bytes(bytes: Self::Bytes) -> Self;
 
+    /// Normalize the counter(value only with non-zero bytes) to normal number [0..]
+    fn normalize(&self) -> Option<Self>;
+    /// Converts a value into a counter. Reverse of `normalize`.
+    fn to_counter_value(self) -> Option<Self>;
+
     fn min_counter() -> Self {
         let ones = Self::Bytes::ones();
         Self::from_le_bytes(ones)
+    }
+
+    fn max_counter() -> Self {
+        let filled = Self::Bytes::filled();
+        Self::from_le_bytes(filled)
+    }
+
+    fn max_normalized() -> Self {
+        Self::max_counter().normalize().unwrap()
     }
 }
 
@@ -153,46 +107,58 @@ macro_rules! impl_counter {
             type Bytes = [u8; $sz];
 
             fn pop(&mut self) -> Self {
-                let mut result = *self;
-                if result < Self::min_counter() {
-                    result = Self::min_counter();
+                if self.normalize().is_none() {
+                    *self = Self::min_counter();
                 }
 
-                let bytes = result.to_le_bytes();
-                let next_bytes = bytes.next();
-                *self = Self::from_le_bytes(next_bytes);
+                let out_value = *self;
 
-                result
+                // Safe: We checked above and the counter is valid.
+                let mut normalized = unsafe { self.normalize().unwrap_unchecked() };
+                if normalized == Self::max_normalized() {
+                    normalized = 0;
+                } else {
+                    normalized += 1;
+                }
+
+                // Safe: We ensured that we in the valid range above.
+                *self = unsafe { normalized.to_counter_value().unwrap_unchecked() };
+                out_value
             }
 
             fn push(&mut self) {
-                let bytes = self.to_le_bytes();
-                let prev_bytes = bytes.prev();
-
-                *self = Self::from_le_bytes(prev_bytes);
-                if *self < Self::min_counter() {
+                if self.normalize().is_none() {
                     *self = Self::min_counter();
                 }
+
+                // Safe: We checked above and the counter is valid.
+                let mut normalized = unsafe { self.normalize().unwrap_unchecked() };
+                if normalized == 0 {
+                    normalized = Self::max_normalized();
+                } else {
+                    normalized -= 1;
+                }
+
+                // Safe: We ensured that we in the valid range above.
+                *self = unsafe { normalized.to_counter_value().unwrap_unchecked() };
             }
 
             fn distance(&self, value: &Self) -> usize {
-                let left = self.to_le_bytes();
-                let right = value.to_le_bytes();
+                let normalized_left = self
+                    .normalize()
+                    .expect("The left operand of distance is not a Counter");
+                let normalized_right = value
+                    .normalize()
+                    .expect("The right operand of distance is not a Counter");
 
-                left.distance(&right)
+                if normalized_left <= normalized_right {
+                    return normalized_right as usize - normalized_left as usize;
+                }
 
-                // if *self < *value {
-                //     (value - self) as usize
-                // } else {
-                //     // 0 1 2 3 4 5 6 7 8 9
-                //     //   $     ^---------^
-                //     //   |         9-4=5
-                //     //    \ 1 step
+                let to_max = Self::max_normalized() - normalized_left;
+                let from_min = normalized_right /*- 0*/ + 1;
 
-                //     let to_max_dist = <$x>::MAX - *self;
-                //     let from_min_dist = *value - <$x>::min_counter() + 1;
-                //     to_max_dist as usize + from_min_dist as usize
-                // }
+                to_max as usize + from_min as usize
             }
 
             fn to_le_bytes(&self) -> Self::Bytes {
@@ -201,6 +167,40 @@ macro_rules! impl_counter {
 
             fn from_le_bytes(bytes: Self::Bytes) -> Self {
                 Self::from_le_bytes(bytes)
+            }
+
+            fn normalize(&self) -> Option<Self> {
+                let mut out_value = 0;
+
+                let bytes = self.to_le_bytes();
+                for (pos, byte) in bytes.iter().copied().enumerate() {
+                    if byte < 1 {
+                        return None;
+                    }
+                    out_value += (byte as $x - 1) * (255 as $x).pow(pos as u32);
+                }
+
+                Some(out_value)
+            }
+
+            fn to_counter_value(self) -> Option<Self> {
+                if Self::max_normalized() < self {
+                    return None;
+                }
+
+                let mut out_value = 0;
+
+                let mut cur_value = self;
+                for i in 0..$sz {
+                    let new_reminder = cur_value % 255; // is the amount of possible values in [1..255]
+                    cur_value /= 255;
+
+                    out_value += (new_reminder + 1) << (8 * i);
+                }
+
+                debug_assert_eq!(0, cur_value);
+
+                Some(out_value)
             }
         }
     };
@@ -228,6 +228,7 @@ impl_counter!(u64, 8);
 mod tests {
     use super::*;
 
+    /// Test that incrementing a decrementing is working
     #[cfg(any(
         target_pointer_width = "16",
         target_pointer_width = "32",
@@ -244,6 +245,7 @@ mod tests {
         assert_eq!(test_counter, u16::min_counter());
     }
 
+    /// Check tha distance between value before and after increment is equal to 1
     #[cfg(any(
         target_pointer_width = "16",
         target_pointer_width = "32",
@@ -254,7 +256,127 @@ mod tests {
         let mut test_counter = 0x0101_u16;
         let pop_value = test_counter.pop();
         assert_eq!(pop_value.distance(&test_counter), 1);
-        assert_eq!(test_counter.distance(&pop_value), 65534);
+    }
+
+    /// Check tha distance between value before and after increment is equal to 1, if the counter reaches the maximum value
+    #[cfg(any(
+        target_pointer_width = "16",
+        target_pointer_width = "32",
+        target_pointer_width = "64"
+    ))]
+    #[test]
+    fn distance_overflow() {
+        let mut test_counter = 0xFFFF_u16;
+        let pop_value = test_counter.pop();
+        assert_eq!(pop_value.distance(&test_counter), 1);
+    }
+
+    /// Checks amount of values between max and min counter for u8
+    #[cfg(any(
+        target_pointer_width = "16",
+        target_pointer_width = "32",
+        target_pointer_width = "64"
+    ))]
+    #[test]
+    fn interval_u8() {
+        let max_counter = 0xFF_u8;
+        let min_counter = 0x01_u8;
+
+        let distance = min_counter.distance(&max_counter);
+        assert_eq!(distance, u8::max_normalized() as usize);
+    }
+
+    /// Checks amount of values between max and min counter for u16
+    #[cfg(any(
+        target_pointer_width = "16",
+        target_pointer_width = "32",
+        target_pointer_width = "64"
+    ))]
+    #[test]
+    fn interval_u16() {
+        let max_counter = 0xFFFF_u16;
+        let min_counter = 0x0101_u16;
+
+        let distance = min_counter.distance(&max_counter);
+        assert_eq!(distance, u16::max_normalized() as usize);
+    }
+
+    /// Checks amount of values between max and min counter for u32
+    #[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]
+    #[test]
+    fn interval_u32() {
+        let max_counter = 0xFFFFFFFF_u32;
+        let min_counter = 0x01010101_u32;
+
+        let distance = min_counter.distance(&max_counter);
+        assert_eq!(distance, u32::max_normalized() as usize);
+    }
+
+    /// Checks amount of values between max and min counter for u64
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn interval_u64() {
+        let max_counter = 0xFFFFFFFF_FFFFFFFF_u64;
+        let min_counter = 0x01010101_01010101_u64;
+
+        let distance = min_counter.distance(&max_counter);
+        assert_eq!(distance, u64::max_normalized() as usize);
+    }
+
+    #[cfg(any(
+        target_pointer_width = "16",
+        target_pointer_width = "32",
+        target_pointer_width = "64"
+    ))]
+    #[test]
+    fn distance_u8() {
+        let mut test_counter = 0x01_u8;
+        for _ in 0..255 {
+            let pop_value = test_counter.pop();
+            assert_eq!(pop_value.distance(&test_counter), 1);
+            assert_eq!(test_counter.distance(&pop_value), 254);
+            test_counter = pop_value;
+        }
+    }
+
+    #[cfg(any(
+        target_pointer_width = "16",
+        target_pointer_width = "32",
+        target_pointer_width = "64"
+    ))]
+    #[test]
+    fn distance_u16() {
+        let mut test_counter = 0x0101_u16;
+        for _ in 0..65025 {
+            let pop_value = test_counter.pop();
+            assert_eq!(pop_value.distance(&test_counter), 1);
+        }
+    }
+
+    #[cfg(any(
+        target_pointer_width = "16",
+        target_pointer_width = "32",
+        target_pointer_width = "64"
+    ))]
+    #[test]
+    fn distance_u16_big_diff() {
+        let small = 0x0101_u16;
+        let big = 0x0201_u16;
+
+        assert_eq!(small.distance(&big), 255);
+    }
+
+    #[cfg(any(
+        target_pointer_width = "16",
+        target_pointer_width = "32",
+        target_pointer_width = "64"
+    ))]
+    #[test]
+    fn distance_overflow_u8() {
+        let mut test_counter = 0xFF_u8;
+        let pop_value = test_counter.pop();
+        assert_eq!(pop_value.distance(&test_counter), 1);
+        assert_eq!(test_counter.distance(&pop_value), 254);
     }
 
     #[cfg(any(
@@ -312,4 +434,19 @@ mod tests {
         let recv_value = u16::from_le_bytes(recv_bytes);
         assert_eq!(recv_value, test_counter)
     }
+
+    // #[cfg(any(
+    //     target_pointer_width = "16",
+    //     target_pointer_width = "32",
+    //     target_pointer_width = "64"
+    // ))]
+    // #[test]
+    // fn print_u16() {
+    //     let mut test_counter = 0_u16;
+
+    //     for i in 0..65535 {
+    //         let pop_value = test_counter.pop();
+    //         println!("{}\t: {:04x}", i, pop_value);
+    //     }
+    // }
 }
