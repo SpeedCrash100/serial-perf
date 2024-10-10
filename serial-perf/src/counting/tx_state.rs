@@ -36,6 +36,11 @@ where
         }
     }
 
+    pub fn reset(&mut self) {
+        self.number_to_send = Default::default();
+        self.data_to_send.clear();
+    }
+
     pub fn peek(&mut self) -> u8 {
         if self.data_to_send.is_empty() {
             self.prepare_next_packet();

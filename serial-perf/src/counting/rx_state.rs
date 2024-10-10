@@ -21,6 +21,8 @@ pub struct RxState<Number, LossStats> {
 
     /// The statistics of the packet loss. Note: this is not a rx_stats because it's analyze packets, not bytes
     loss_stats: LossStats,
+
+    checksum_enabled: bool,
 }
 
 impl<Number, LossStats> RxState<Number, LossStats>
@@ -34,6 +36,17 @@ where
             current_packet: heapless::Vec::new(),
             internal_state: InternalState::Receiving,
             loss_stats,
+            checksum_enabled: true,
+        }
+    }
+
+    pub fn new_without_checksum(loss_stats: LossStats) -> Self {
+        Self {
+            number: None,
+            current_packet: heapless::Vec::new(),
+            internal_state: InternalState::Receiving,
+            loss_stats,
+            checksum_enabled: false,
         }
     }
 
@@ -46,7 +59,15 @@ where
 
     /// Parses and handling incoming packet
     fn parse_current_packet(&mut self, crc: u8) {
-        if let Some(new_number_raw) = Number::Bytes::from_slice_checked(&self.current_packet, crc) {
+        let checksum = if self.checksum_enabled {
+            Some(crc)
+        } else {
+            None
+        };
+
+        if let Some(new_number_raw) =
+            Number::Bytes::from_slice_checked(&self.current_packet, checksum)
+        {
             let new_number = Number::from_le_bytes(new_number_raw);
             self.on_new_number(new_number);
         }

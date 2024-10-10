@@ -76,14 +76,14 @@ where
         Self {
             serial,
             tx_state: TxState::new_without_checksum(),
-            rx_state: RxState::new(loss_stats),
+            rx_state: RxState::new_without_checksum(loss_stats),
             tx_stats,
             rx_stats,
         }
     }
 
     pub fn reset(&mut self) {
-        self.tx_state = Default::default();
+        self.tx_state.reset();
         self.rx_state.reset();
         self.tx_stats.reset();
         self.rx_stats.reset();
