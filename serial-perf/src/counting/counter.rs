@@ -228,7 +228,7 @@ impl_counter!(u64, 8);
 mod tests {
     use super::*;
 
-    /// Test that incrementing a decrementing is working
+    /// Test that incrementing and decrementing is working
     #[cfg(any(
         target_pointer_width = "16",
         target_pointer_width = "32",
@@ -245,7 +245,7 @@ mod tests {
         assert_eq!(test_counter, u16::min_counter());
     }
 
-    /// Check tha distance between value before and after increment is equal to 1
+    /// Check that distance between value before and after increment is equal to 1
     #[cfg(any(
         target_pointer_width = "16",
         target_pointer_width = "32",
@@ -258,7 +258,7 @@ mod tests {
         assert_eq!(pop_value.distance(&test_counter), 1);
     }
 
-    /// Check tha distance between value before and after increment is equal to 1, if the counter reaches the maximum value
+    /// Check that distance between value before and after increment is equal to 1, if the counter reaches the maximum value
     #[cfg(any(
         target_pointer_width = "16",
         target_pointer_width = "32",

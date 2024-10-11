@@ -21,6 +21,7 @@ linux-embedded-hal = "0.4"
 clap = { version = "4.5", features = ["derive"] }
 nb = "1.1.0"
 anyhow = "1"
+criterion = { version = "0.5", features = ["html_reports"] }
 
 
 [[example]]
@@ -33,4 +34,18 @@ required-features = ["std"]
 
 [[example]]
 name = "linux_rate_measure_sink"
+required-features = ["std"]
+
+
+[[bench]]
+name = "counting_no_stats"
+harness = false
+
+[[bench]]
+name = "counting_cnt_stats"
+harness = false
+
+[[bench]]
+name = "counting_rate_stats"
+harness = false
 required-features = ["std"]
