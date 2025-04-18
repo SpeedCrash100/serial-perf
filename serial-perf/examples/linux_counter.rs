@@ -1,6 +1,10 @@
-use std::time::{Duration, Instant};
+use std::{
+    fmt::Display,
+    time::{Duration, Instant},
+};
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
+use embedded_hal_nb::serial::Read;
 use linux_embedded_hal::Serial;
 use serial_perf::{
     byte_rate::{
@@ -9,10 +13,27 @@ use serial_perf::{
     },
     clock::StdClock,
     counting::Counting,
-    statistics::CountingStatistics,
+    statistics::{CountingStatistics, IntervalRateStatistics},
 };
 
 const PRINT_INTERVAL_MS: u64 = 5000;
+
+#[derive(Debug, Clone, ValueEnum)]
+pub enum Mode {
+    Client,
+    Server,
+    Double,
+}
+
+impl Display for Mode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Client => write!(f, "client"),
+            Self::Server => write!(f, "server"),
+            Self::Double => write!(f, "double"),
+        }
+    }
+}
 
 #[derive(Parser)]
 pub struct CommonArgs {
@@ -30,6 +51,9 @@ pub struct CommonArgs {
     /// Time for byte rate limit if zero - unlimited
     #[clap(long, default_value_t = 0)]
     byte_limit_interval_us: usize,
+
+    #[clap(long, default_value_t = Mode::Double)]
+    mode: Mode,
 }
 
 impl CommonArgs {
@@ -48,12 +72,17 @@ fn main() -> anyhow::Result<()> {
     );
     let rate_limiter = PollingByteRateLimiter::new(rate_limit, &clock);
 
-    let serial = args.create_serial();
+    let mut serial = args.create_serial();
+    while !matches!(serial.read(), Err(nb::Error::WouldBlock)) {
+        // Linux can return some data from previous run, resulting in high loss value
+        // The old counter returns 9000, the new one 1 which is 9000-> u16::MAX + 1 -> 9000 -> About a u16::max value value loss packages
+    }
+
     let limited_serial = ByteRateSerialLimiter::new(serial, rate_limiter);
-    let mut counter = Counting::<_, u16>::new(
+    let mut counter = Counting::<_, u64, _, _, _>::new(
         limited_serial,
-        CountingStatistics::default(),
-        CountingStatistics::default(),
+        IntervalRateStatistics::new(&clock, Duration::from_millis(PRINT_INTERVAL_MS)),
+        IntervalRateStatistics::new(&clock, Duration::from_millis(PRINT_INTERVAL_MS)),
         CountingStatistics::default(),
     );
 
@@ -61,29 +90,62 @@ fn main() -> anyhow::Result<()> {
 
     println!("Start loop");
     loop {
-        nb::block!(counter.loop_nb())?;
+        match args.mode {
+            Mode::Client => {
+                nb::block!(counter.send_nb())?;
+            }
+
+            Mode::Server => {
+                nb::block!(counter.recv_nb())?;
+            }
+
+            Mode::Double => {
+                nb::block!(counter.loop_nb())?;
+            }
+        }
 
         if Duration::from_millis(PRINT_INTERVAL_MS) < last_print.elapsed() {
-            println!(
-                "TX(bytes): sent: {}, errors: {}",
-                counter.tx_stats().successful(),
-                counter.tx_stats().failed()
-            );
-
-            println!(
-                "RX(bytes): total: {}, errors: {}",
-                counter.rx_stats().total(),
-                counter.rx_stats().failed()
-            );
-
-            if counter.loss_stats().total() != 0 {
+            if matches!(args.mode, Mode::Client | Mode::Double) {
                 println!(
-                    "RX(packet): loss: {}, total: {}, {:.02}%",
-                    counter.loss_stats().failed(),
-                    counter.loss_stats().total(),
-                    (counter.loss_stats().failed() * 10000 / counter.loss_stats().total()) as f64
-                        / 100.0
+                    "TX(bytes): sent: {} B/s, errors: {} B/s",
+                    counter
+                        .tx_stats()
+                        .success_rate()
+                        .bytes_per_second_f64()
+                        .unwrap_or(0.0),
+                    counter
+                        .tx_stats()
+                        .failed_rate()
+                        .bytes_per_second_f64()
+                        .unwrap_or(0.0)
                 );
+            }
+
+            if matches!(args.mode, Mode::Server | Mode::Double) {
+                println!(
+                    "RX(bytes): success: {} B/s, errors: {} B/s",
+                    counter
+                        .rx_stats()
+                        .success_rate()
+                        .bytes_per_second_f64()
+                        .unwrap_or(0.0),
+                    counter
+                        .rx_stats()
+                        .failed_rate()
+                        .bytes_per_second_f64()
+                        .unwrap_or(0.0)
+                );
+
+                if counter.loss_stats().total() != 0 {
+                    println!(
+                        "RX(packet): loss: {}, total: {}, {:.02}%",
+                        counter.loss_stats().failed(),
+                        counter.loss_stats().total(),
+                        (counter.loss_stats().failed() * 10000 / counter.loss_stats().total())
+                            as f64
+                            / 100.0
+                    );
+                }
             }
 
             last_print = Instant::now();
