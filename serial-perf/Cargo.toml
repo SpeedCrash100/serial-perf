@@ -24,6 +24,7 @@ clap = { version = "4.5", features = ["derive"] }
 nb = "1.1.0"
 anyhow = "1"
 criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1"
 
 
 [[example]]

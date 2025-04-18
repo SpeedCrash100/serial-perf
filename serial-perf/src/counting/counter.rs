@@ -227,6 +227,7 @@ impl_counter!(u64, 8);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     /// Test that incrementing and decrementing is working
     #[cfg(any(
@@ -433,6 +434,34 @@ mod tests {
 
         let recv_value = u16::from_le_bytes(recv_bytes);
         assert_eq!(recv_value, test_counter)
+    }
+
+    proptest! {
+
+        #[test]
+        fn any_step_u16(init_val in 0..=u16::max_normalized(), step in 0..u16::max_normalized()) {
+            let init_counter = init_val.to_counter_value().unwrap();
+            let mut counter = init_val.to_counter_value().unwrap();
+            for _ in 0..step {
+                let _ = counter.pop();
+            }
+
+            let distance = init_counter.distance(&counter);
+            prop_assert_eq!(step, distance as u16);
+        }
+
+        #[test]
+        fn any_step_u8(init_val in 0..=u8::max_normalized(), step in 0..u8::max_normalized()) {
+            let init_counter = init_val.to_counter_value().unwrap();
+            let mut counter = init_val.to_counter_value().unwrap();
+            for _ in 0..step {
+                let _ = counter.pop();
+            }
+
+            let distance = init_counter.distance(&counter);
+            prop_assert_eq!(step, distance as u8);
+        }
+
     }
 
     // #[cfg(any(
