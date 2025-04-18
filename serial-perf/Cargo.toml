@@ -9,6 +9,8 @@ edition.workspace = true
 
 [features]
 std = ["embedded-timers/std"]
+# enables stdout print when packages damaged
+print = []
 
 [dependencies]
 embedded-hal-nb = "1"

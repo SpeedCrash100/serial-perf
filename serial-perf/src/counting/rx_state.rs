@@ -79,6 +79,13 @@ where
         if let Some(ref old_number) = self.number {
             let distance = old_number.distance(&new_number);
             let loss = distance - 1;
+            #[cfg(feature = "print")]
+            if loss > 0 {
+                let new_normal = Number::min_counter().distance(&new_number);
+                let old_normal = Number::min_counter().distance(old_number);
+                println!("LOST: {:?} -> {:?}: {} lost", old_normal, new_normal, loss);
+            }
+
             self.loss_stats.add_failed(loss);
             // FIXME: Detect absurd jumps?
         }
