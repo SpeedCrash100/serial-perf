@@ -4,7 +4,6 @@ use std::{
 };
 
 use clap::{Parser, ValueEnum};
-use embedded_hal_nb::serial::Read;
 use linux_embedded_hal::Serial;
 use serial_perf::{
     byte_rate::{
@@ -12,7 +11,7 @@ use serial_perf::{
         rate::ByteRate,
     },
     clock::StdClock,
-    counting::Counting,
+    counting::{Counting, ValidCounting},
     statistics::{CountingStatistics, IntervalRateStatistics},
 };
 
@@ -52,6 +51,10 @@ pub struct CommonArgs {
     #[clap(long, default_value_t = 0)]
     byte_limit_interval_us: usize,
 
+    /// Warm up time before test starts. Allows to clear data from previous runs
+    #[clap(long, default_value_t = 2000)]
+    warm_up_time_ms: u32,
+
     #[clap(long, default_value_t = Mode::Double)]
     mode: Mode,
 }
@@ -72,11 +75,7 @@ fn main() -> anyhow::Result<()> {
     );
     let rate_limiter = PollingByteRateLimiter::new(rate_limit, &clock);
 
-    let mut serial = args.create_serial();
-    while !matches!(serial.read(), Err(nb::Error::WouldBlock)) {
-        // Linux can return some data from previous run, resulting in high loss value
-        // The old counter returns 9000, the new one 1 which is 9000-> u16::MAX + 1 -> 9000 -> About a u16::max value value loss packages
-    }
+    let serial = args.create_serial();
 
     let limited_serial = ByteRateSerialLimiter::new(serial, rate_limiter);
     let mut counter = Counting::<_, u64, _, _, _>::new(

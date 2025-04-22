@@ -19,6 +19,22 @@ const MAX_PACKET_SIZE: usize = 10; // 10 - 8 bytes if u64 and 1 byte for nul-ter
 
 use crate::statistics::{CountingStatistics, Statistics};
 
+/// Trait for any valid counting test
+///
+/// The counting test is valid if supported Number type used and correct Stats set. The serial is ignored
+pub trait ValidCounting {
+    type Serial;
+    type Number: Counter;
+    type TxStats: Statistics;
+    type RxStats: Statistics;
+    type LossStats: Statistics;
+
+    fn tx_stats(&self) -> &Self::TxStats;
+    fn rx_stats(&self) -> &Self::RxStats;
+    fn loss_stats(&self) -> &Self::LossStats;
+    fn reset(&mut self);
+}
+
 /// Counting test is a test that sends a special increasing numbers
 /// with checksum and null separator and can receive these packets
 /// and calculate amount of lost packages by comparing the number in package
@@ -81,20 +97,39 @@ where
             rx_stats,
         }
     }
+}
 
-    pub fn reset(&mut self) {
+impl<Serial, Number, TxStats, RxStats, LossStats> ValidCounting
+    for Counting<Serial, Number, TxStats, RxStats, LossStats>
+where
+    Number: Counter,
+    TxStats: Statistics,
+    RxStats: Statistics,
+    LossStats: Statistics,
+{
+    type Serial = Serial;
+    type Number = Number;
+    type TxStats = TxStats;
+    type RxStats = RxStats;
+    type LossStats = LossStats;
+
+    fn tx_stats(&self) -> &TxStats {
+        &self.tx_stats
+    }
+
+    fn rx_stats(&self) -> &RxStats {
+        &self.rx_stats
+    }
+
+    fn loss_stats(&self) -> &LossStats {
+        self.rx_state.loss_stats()
+    }
+
+    fn reset(&mut self) {
         self.tx_state.reset();
         self.rx_state.reset();
         self.tx_stats.reset();
         self.rx_stats.reset();
-    }
-
-    pub fn tx_stats(&self) -> &TxStats {
-        &self.tx_stats
-    }
-
-    pub fn rx_stats(&self) -> &RxStats {
-        &self.rx_stats
     }
 }
 
@@ -114,9 +149,5 @@ where
     fn on_byte_sent(&mut self) {
         self.tx_state.take();
         self.tx_stats.add_successful(1);
-    }
-
-    pub fn loss_stats(&self) -> &LossStats {
-        self.rx_state.loss_stats()
     }
 }
