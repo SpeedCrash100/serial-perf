@@ -11,7 +11,7 @@ use serial_perf::{
         rate::ByteRate,
     },
     clock::StdClock,
-    counting::{Counting, ValidCounting},
+    counting::{prelude::*, Counting},
     statistics::{CountingStatistics, IntervalRateStatistics},
 };
 

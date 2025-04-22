@@ -1,5 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use serial_perf::{clock::StdClock, counting::Counting, statistics::IntervalRateStatistics};
+use serial_perf::{
+    clock::StdClock, counting::prelude::*, counting::Counting, statistics::IntervalRateStatistics,
+};
 use std::{convert::Infallible, time::Duration};
 
 const BENCH_GROUP: &str = "counting rate stats";

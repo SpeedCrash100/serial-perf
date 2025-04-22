@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use serial_perf::{counting::Counting, statistics::CountingStatistics};
+use serial_perf::{counting::prelude::*, counting::Counting, statistics::CountingStatistics};
 use std::convert::Infallible;
 
 const BENCH_GROUP: &str = "counting cnt stats";

@@ -18,6 +18,17 @@ use tx_state::TxState;
 const MAX_PACKET_SIZE: usize = 10; // 10 - 8 bytes if u64 and 1 byte for nul-terminator 1 byte for crc
 
 use crate::statistics::{CountingStatistics, Statistics};
+pub use {
+    nb::ValidCountingNb, nb::ValidCountingNbError, nb::ValidCountingNbRead,
+    nb::ValidCountingNbWrite,
+};
+
+pub mod prelude {
+    pub use super::{
+        ValidCounting, ValidCountingNb, ValidCountingNbError, ValidCountingNbRead,
+        ValidCountingNbWrite,
+    };
+}
 
 /// Trait for any valid counting test
 ///
