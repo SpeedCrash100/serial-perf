@@ -4,7 +4,7 @@ use std::{
 };
 
 use clap::{Parser, ValueEnum};
-use linux_embedded_hal::Serial;
+use linux_embedded_hal::{Serial, SerialError};
 use serial_perf::{
     byte_rate::{
         limit::{ByteRateSerialLimiter, PollingByteRateLimiter},
@@ -16,6 +16,9 @@ use serial_perf::{
 };
 
 const PRINT_INTERVAL_MS: u64 = 5000;
+
+/// Global clock source for the application
+static CLOCK: StdClock = StdClock;
 
 #[derive(Debug, Clone, ValueEnum)]
 pub enum Mode {
@@ -52,7 +55,7 @@ pub struct CommonArgs {
     byte_limit_interval_us: usize,
 
     /// Warm up time before test starts. Allows to clear data from previous runs
-    #[clap(long, default_value_t = 2000)]
+    #[clap(long, default_value_t = 5000)]
     warm_up_time_ms: u32,
 
     #[clap(long, default_value_t = Mode::Double)]
@@ -60,48 +63,102 @@ pub struct CommonArgs {
 }
 
 impl CommonArgs {
-    pub fn create_serial(&self) -> Serial {
+    fn create_serial(&self) -> Serial {
         Serial::open(self.port.clone(), self.baud_rate).expect("failed to create serial")
     }
+
+    fn create_counting_test(&self) -> impl AppCounting {
+        let rate_limit = ByteRate::new(
+            self.byte_limit,
+            Duration::from_micros(self.byte_limit_interval_us as u64),
+        );
+        let rate_limiter = PollingByteRateLimiter::new(rate_limit, &CLOCK);
+
+        let serial = self.create_serial();
+
+        let limited_serial = ByteRateSerialLimiter::new(serial, rate_limiter);
+        let counter = Counting::<_, u64, _, _, _>::new(
+            limited_serial,
+            IntervalRateStatistics::new(&CLOCK, Duration::from_millis(PRINT_INTERVAL_MS)),
+            IntervalRateStatistics::new(&CLOCK, Duration::from_millis(PRINT_INTERVAL_MS)),
+            CountingStatistics::default(),
+        );
+
+        counter
+    }
+}
+
+trait AppCounting:
+    ValidCountingNb<
+    Error = SerialError,
+    TxStats = IntervalRateStatistics<'static, StdClock>,
+    RxStats = IntervalRateStatistics<'static, StdClock>,
+    LossStats = CountingStatistics,
+>
+{
+    fn tick_io(&mut self, mode: &Mode) -> Result<(), SerialError> {
+        match mode {
+            Mode::Client => {
+                nb::block!(self.send_nb())?;
+            }
+
+            Mode::Server => {
+                nb::block!(self.recv_nb())?;
+            }
+
+            Mode::Double => {
+                nb::block!(self.loop_nb())?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn warm_up(&mut self, args: &CommonArgs) -> anyhow::Result<()> {
+        let warm_up_duration = Duration::from_millis(args.warm_up_time_ms as u64);
+        println!("Warm up {:.3} seconds...", warm_up_duration.as_secs_f64());
+
+        let start = Instant::now();
+        let end = start + warm_up_duration;
+
+        while Instant::now() < end {
+            match self.recv_nb() {
+                Ok(_) => {}
+                Err(nb::Error::WouldBlock) => {}
+                Err(nb::Error::Other(err)) => {
+                    return Err(err.into());
+                }
+            }
+        }
+
+        self.reset();
+
+        Ok(())
+    }
+}
+
+impl<T> AppCounting for T where
+    T: ValidCountingNb<
+        Error = SerialError,
+        TxStats = IntervalRateStatistics<'static, StdClock>,
+        RxStats = IntervalRateStatistics<'static, StdClock>,
+        LossStats = CountingStatistics,
+    >
+{
 }
 
 fn main() -> anyhow::Result<()> {
     let args = CommonArgs::parse();
 
-    let clock = StdClock;
-    let rate_limit = ByteRate::new(
-        args.byte_limit,
-        Duration::from_micros(args.byte_limit_interval_us as u64),
-    );
-    let rate_limiter = PollingByteRateLimiter::new(rate_limit, &clock);
+    let mut counter = args.create_counting_test();
 
-    let serial = args.create_serial();
-
-    let limited_serial = ByteRateSerialLimiter::new(serial, rate_limiter);
-    let mut counter = Counting::<_, u64, _, _, _>::new(
-        limited_serial,
-        IntervalRateStatistics::new(&clock, Duration::from_millis(PRINT_INTERVAL_MS)),
-        IntervalRateStatistics::new(&clock, Duration::from_millis(PRINT_INTERVAL_MS)),
-        CountingStatistics::default(),
-    );
+    counter.warm_up(&args)?;
 
     let mut last_print = Instant::now();
 
-    println!("Start loop");
+    println!("Test started");
     loop {
-        match args.mode {
-            Mode::Client => {
-                nb::block!(counter.send_nb())?;
-            }
-
-            Mode::Server => {
-                nb::block!(counter.recv_nb())?;
-            }
-
-            Mode::Double => {
-                nb::block!(counter.loop_nb())?;
-            }
-        }
+        counter.tick_io(&args.mode)?;
 
         if Duration::from_millis(PRINT_INTERVAL_MS) < last_print.elapsed() {
             if matches!(args.mode, Mode::Client | Mode::Double) {
